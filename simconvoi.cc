@@ -3225,7 +3225,7 @@ station_tile_search_ready: ;
 
 	// prepare a list of all destination halts in the schedule
 	vector_tpl<halthandle_t> destination_halts(schedule->get_count());
-	if (!no_load) {
+	if (  !no_load  &&  !schedule->get_current_entry().is_no_load()  ) {
 		const uint8 count = schedule->get_count();
 		for(  uint8 i=1;  i<count;  i++  ) {
 			const uint8 wrap_i = (i + schedule->get_current_stop()) % count;
@@ -3235,7 +3235,8 @@ station_tile_search_ready: ;
 				// we will come later here again ...
 				break;
 			}
-			else if(  !plan_halt.is_bound()  ) {
+			else if(  !plan_halt.is_bound()  ||  schedule->entries[wrap_i].is_no_unload()  ) {
+				// not a halt or set no_unload. no_unload -> we cannot unload the cargo there.
 				if(  grund_t *gr = welt->lookup( schedule->entries[wrap_i].pos )  ) {
 					if(  gr->get_depot()  ) {
 						// do not load for stops after a depot
@@ -3348,7 +3349,7 @@ station_tile_search_ready: ;
 	while(  !is_coupled()  &&  c.is_bound()  ) {
 		bool cond = c->get_loading_level() >= c->get_schedule()->get_current_entry().minimum_loading; // minimum loading
 		bool waiting_time_cond = (c->get_schedule()->get_current_entry().waiting_time_shift > 0  &&  welt->get_ticks() - arrived_time > (welt->ticks_per_world_month >> (16 - c->get_schedule()->get_current_entry().waiting_time_shift)) ); // waiting time
-		bool coupling_cond = (c->get_schedule()->get_current_entry().coupling_point==1  &&  !c->is_coupling_done()  &&  !(c->get_coupling_convoi().is_bound()  &&  c->is_coupled())); // wait for coupling?
+		bool coupling_cond = (c->get_schedule()->get_current_entry().get_coupling_point()==1  &&  !c->is_coupling_done()  &&  !(c->get_coupling_convoi().is_bound()  &&  c->is_coupled())); // wait for coupling?
 		cond &= !coupling_cond;
 		cond |= c->get_no_load(); // no load
 		cond |= waiting_time_cond;
@@ -3839,12 +3840,12 @@ void convoi_t::check_pending_updates()
 				 * We are already there => keep current state
 				 */
 			}
-			else {
+			else if(  !is_coupled()  ) {
 				// need re-routing
 				state = EDIT_SCHEDULE;
 			}
 			// make this change immediately
-			if(  state!=LOADING  ) {
+			if(  !is_loading()  ) {
 				wait_lock = 0;
 			}
 		}
@@ -4612,7 +4613,7 @@ bool convoi_t::can_start_coupling(convoi_t* parent) const {
 	const schedule_entry_t p_c = parent->get_schedule()->get_current_entry();
 	const schedule_entry_t p_n = parent->get_schedule()->get_next_entry();
 	
-	if(  p_c.coupling_point!=1  ||  t_c.coupling_point!=2  ) {
+	if(  p_c.get_coupling_point()!=1  ||  t_c.get_coupling_point()!=2  ) {
 		// rejected by coupling_point condition.
 		return false;
 	}
@@ -4627,7 +4628,7 @@ bool convoi_t::is_waiting_for_coupling() const {
 	convoihandle_t c = self;
 	bool waiting_for_coupling = false;
 	while(  c.is_bound()  ) {
-		waiting_for_coupling |= (!c->get_coupling_convoi().is_bound()  &&  c->get_schedule()->get_current_entry().coupling_point==1);
+		waiting_for_coupling |= (!c->get_coupling_convoi().is_bound()  &&  c->get_schedule()->get_current_entry().get_coupling_point()==1);
 		c = c->get_coupling_convoi();
 	}
 	return waiting_for_coupling;

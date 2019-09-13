@@ -3626,7 +3626,7 @@ skip_choose:
 
 	target_halt = target->get_halt();
 	bool route_found = false;
-	bool try_coupling = cnv->get_schedule()->get_current_entry().coupling_point==2;
+	bool try_coupling = cnv->get_schedule()->get_current_entry().get_coupling_point()==2;
 	if(  !try_coupling  ) {
 		// call block_reserver only when the next halt is not a coupling point.
 		route_found = block_reserver( cnv->get_route(), start_block+1, next_signal, next_crossing, 100000, true, false );
@@ -3782,11 +3782,8 @@ bool rail_vehicle_t::is_signal_clear(uint16 next_block, sint32 &restart_speed)
 		cnv->clear_reserved_tiles();
 	}
 
-	// simple signal: drive on, if next block is free
-	if(  !sig_desc->is_longblock_signal() &&
-      !sig_desc->is_choose_sign() &&
-      !sig_desc->is_pre_signal() &&
-      !sig_desc->is_priority_signal()) {
+	// simple signal: fail, if next block is not free
+	if(  sig_desc->is_simple_signal()  ) {
 
 		uint16 next_signal, next_crossing;
 		if(  block_reserver( cnv->get_route(), next_block+1, next_signal, next_crossing, 0, true, false )  ) {
@@ -4117,7 +4114,7 @@ bool rail_vehicle_t::can_couple(const route_t* route, uint16 start_index, uint16
 		}
 		idx = (idx+1)%cnv->get_schedule()->get_count();
 	} while(  idx!=cnv->get_schedule()->get_current_stop()  );
-	if(  !stop_found  ||  cnv->get_schedule()->entries[idx].coupling_point!=2  ) {
+	if(  !stop_found  ||  cnv->get_schedule()->entries[idx].get_coupling_point()!=2  ) {
 		// all schedule entries are waypoint or the next stop point is not a coupling point.
 		return false;
 	}
