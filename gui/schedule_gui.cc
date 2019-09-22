@@ -422,7 +422,6 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 		lb_spacing.set_align(gui_label_t::align_t::centered);
 		sprintf(lb_spacing_str,"off");
 		lb_spacing.set_text_pointer(lb_spacing_str);
-		//p==0 ? sprintf(lb_spacing_str,"off") : sprintf(lb_spacing_str,"%d",welt->get_settings().get_spacing_shift_divisor()/p);
 		add_component(&lb_spacing);
 		
 		new_component<gui_fill_t>();
@@ -430,31 +429,29 @@ void schedule_gui_t::init(schedule_t* schedule_, player_t* player, convoihandle_
 		lb_title1.set_text("Spacing cnv/month, shift");
 		add_component(&lb_title1);
 		
+		const uint16 spacing_divisor = world()->get_settings().get_spacing_shift_divisor();
+		
 		numimp_spacing.set_width( 60 );
-		//numimp_spacing.set_value( schedule->get_spacing() );
 		numimp_spacing.set_value( 5 );
-		//numimp_spacing.set_limits( 0, spacing_divisor );
+		numimp_spacing.set_limits( 1, spacing_divisor );
 		numimp_spacing.set_increment_mode(1);
 		numimp_spacing.disable();
 		numimp_spacing.add_listener(this);
 		add_component(&numimp_spacing);
 		
 		numimp_spacing_shift.set_width( 90 );
-		//numimp_spacing_shift.set_value( schedule->get_current_entry().spacing_shift );
 		numimp_spacing_shift.set_value( 0 );
-		//numimp_spacing_shift.set_limits( 0, spacing_divisor );
+		numimp_spacing_shift.set_limits( 0, spacing_divisor );
 		numimp_spacing_shift.set_increment_mode(1);
-		numimp_spacing_shift.disable();
 		numimp_spacing_shift.add_listener(this);
+		numimp_spacing_shift.disable();
 		add_component(&numimp_spacing_shift);
 		
 		lb_title2.set_text("Delay tolerance");
 		add_component(&lb_title2);
 		
 		numimp_delay_tolerance.set_width( 90 );
-		//numimp_delay_tolerance.set_value( schedule->get_current_entry().delay_tolerance );
 		numimp_delay_tolerance.set_value( 0 );
-		//numimp_delay_tolerance.set_limits( 0, p==0 ? 0 : spacing_divisor/schedule->get_spacing()/2 );
 		numimp_delay_tolerance.set_increment_mode(1);
 		numimp_delay_tolerance.disable();
 		numimp_delay_tolerance.add_listener(this);
@@ -547,33 +544,25 @@ void schedule_gui_t::update_tool(bool set)
 
 void schedule_gui_t::update_selection()
 {
+	// First, disable all.
 	lb_wait.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
 	wait_load.disable();
+	lb_load.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
+	numimp_load.disable();
+	numimp_load.set_value( 0 );
+	bt_find_parent.disable();
+	bt_wait_for_child.disable();
+	bt_no_load.disable();
+	bt_no_unload.disable();
+	bt_wait_for_time.disable();
+	numimp_spacing.disable();
+	numimp_spacing_shift.disable();
+	numimp_delay_tolerance.disable();
 
 	if(  !schedule->empty()  ) {
 		schedule->set_current_stop( min(schedule->get_count()-1,schedule->get_current_stop()) );
 		const uint8 current_stop = schedule->get_current_stop();
 		if(  haltestelle_t::get_halt(schedule->entries[current_stop].pos, player).is_bound()  ) {
-			lb_load.set_color( SYSCOL_TEXT );
-			numimp_load.enable();
-			numimp_load.set_value( schedule->entries[current_stop].minimum_loading );
-
-			sint8 wait = 0;
-			if(  schedule->entries[current_stop].minimum_loading>0  ||  schedule->entries[current_stop].get_coupling_point()!=0  ) {
-				lb_wait.set_color( SYSCOL_TEXT );
-				wait_load.enable();
-
-				wait = schedule->entries[current_stop].waiting_time_shift;
-			}
-
-			for(int i=0; i<wait_load.count_elements(); i++) {
-				if (gui_waiting_time_item_t *item = dynamic_cast<gui_waiting_time_item_t*>( wait_load.get_element(i) ) ) {
-					if (item->get_wait_shift() == wait) {
-						wait_load.set_selection(i);
-						break;
-					}
-				}
-			}
 			
 			const uint8 c = schedule->entries[current_stop].get_coupling_point();
 			bt_find_parent.enable();
@@ -584,15 +573,47 @@ void schedule_gui_t::update_selection()
 			bt_no_load.pressed = schedule->entries[current_stop].is_no_load();
 			bt_no_unload.enable();
 			bt_no_unload.pressed = schedule->entries[current_stop].is_no_unload();
-		}
-		else {
-			lb_load.set_color( SYSCOL_BUTTON_TEXT_DISABLED );
-			numimp_load.disable();
-			numimp_load.set_value( 0 );
-			bt_find_parent.disable();
-			bt_wait_for_child.disable();
-			bt_no_load.disable();
-			bt_no_unload.disable();
+			
+			// wait_for_time releated things
+			const bool wft = schedule->entries[current_stop].get_wait_for_time();
+			bt_wait_for_time.enable();
+			bt_wait_for_time.pressed = wft;
+			sint8 wait = 0;
+			if(  wft  ) {
+				// enable departure time settings only
+				//schedule->entries[current_stop].spacing cannot be zero.
+				sprintf(lb_spacing_str, "%d", world()->get_settings().get_spacing_shift_divisor()/schedule->entries[current_stop].spacing);
+				numimp_spacing.enable();
+				numimp_spacing_shift.enable();
+				numimp_delay_tolerance.enable();
+			}
+			else {
+				// disable departure time settings and enable minimum loading
+				lb_load.set_color( SYSCOL_TEXT );
+				numimp_load.enable();
+				if(  schedule->entries[current_stop].minimum_loading>0  ||  schedule->entries[current_stop].get_coupling_point()!=0  ) {
+					lb_wait.set_color( SYSCOL_TEXT );
+					wait_load.enable();
+					wait = schedule->entries[current_stop].waiting_time_shift;
+				}
+				sprintf(lb_spacing_str, "off");
+			}
+			
+			numimp_load.set_value( schedule->entries[current_stop].minimum_loading );
+			numimp_spacing.set_value( schedule->entries[current_stop].spacing );
+			numimp_spacing_shift.set_value( schedule->entries[current_stop].spacing_shift );
+			numimp_delay_tolerance.set_value( schedule->entries[current_stop].delay_tolerance );
+			
+			// wait_load configuration
+			for(int i=0; i<wait_load.count_elements(); i++) {
+				if (gui_waiting_time_item_t *item = dynamic_cast<gui_waiting_time_item_t*>( wait_load.get_element(i) ) ) {
+					if (item->get_wait_shift() == wait) {
+						wait_load.set_selection(i);
+						break;
+					}
+				}
+			}
+			
 		}
 	}
 }
@@ -789,6 +810,46 @@ DBG_MESSAGE("schedule_gui_t::action_triggered()","comp=%p combo=%p",comp,&line_s
 		schedule->set_temporary(!bt_tmp_schedule.pressed);
 		bt_tmp_schedule.pressed = schedule->is_temporary();
 	}
+	else if(comp == &bt_wait_for_time) {
+		if (!schedule->empty()) {
+			schedule->entries[schedule->get_current_stop()].set_wait_for_time(!bt_wait_for_time.pressed);
+			update_selection();
+		}
+	}
+	else if(comp == &numimp_spacing) {
+		if (!schedule->empty()) {
+			if(  schedule->is_same_dep_time()  ) {
+				schedule->set_spacing_for_all((uint16)p.i);
+			} else {
+				schedule->entries[schedule->get_current_stop()].spacing = (uint16)p.i;
+			}
+			update_selection();
+		}
+	}
+	else if(comp == &numimp_spacing_shift) {
+		if (!schedule->empty()) {
+			if(  schedule->is_same_dep_time()  ) {
+				schedule->set_spacing_shift_for_all((uint16)p.i);
+			} else {
+				schedule->entries[schedule->get_current_stop()].spacing_shift = (uint16)p.i;
+			}
+			update_selection();
+		}
+	}
+	else if(comp == &numimp_delay_tolerance) {
+		if (!schedule->empty()) {
+			if(  schedule->is_same_dep_time()  ) {
+				schedule->set_delay_tolerance_for_all((uint16)p.i);
+			} else {
+				schedule->entries[schedule->get_current_stop()].delay_tolerance = (uint16)p.i;
+			}
+			update_selection();
+		}
+	}
+	else if(comp == &bt_same_dep_time) {
+		schedule->set_same_dep_time(!schedule->is_same_dep_time());
+		bt_same_dep_time.pressed = schedule->is_same_dep_time();
+	}
 	// recheck lines
 	if(  cnv.is_bound()  ) {
 		// unequal to line => remove from line ...
@@ -945,14 +1006,14 @@ void schedule_gui_t::extract_advanced_settings(bool yesno) {
 	bt_tmp_schedule.set_visible(yesno);
 	bt_no_load.set_visible(yesno);
 	bt_no_unload.set_visible(yesno);
-	bt_wait_for_time.set_visible(false);
-	lb_spacing.set_visible(false);
-	lb_title1.set_visible(false);
-	lb_title2.set_visible(false);
-	numimp_spacing.set_visible(false);
-	numimp_spacing_shift.set_visible(false);
-	numimp_delay_tolerance.set_visible(false);
-	bt_same_dep_time.set_visible(false);
+	bt_wait_for_time.set_visible(yesno);
+	lb_spacing.set_visible(yesno);
+	lb_title1.set_visible(yesno);
+	lb_title2.set_visible(yesno);
+	numimp_spacing.set_visible(yesno);
+	numimp_spacing_shift.set_visible(yesno);
+	numimp_delay_tolerance.set_visible(yesno);
+	bt_same_dep_time.set_visible(yesno);
 	
 	const bool coupling_waytype = schedule->get_waytype()!=road_wt  &&  schedule->get_waytype()!=air_wt  &&  schedule->get_waytype()!=water_wt;
 	bt_wait_for_child.set_visible(coupling_waytype  &&  yesno);

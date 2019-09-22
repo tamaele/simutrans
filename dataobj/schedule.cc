@@ -229,6 +229,8 @@ void schedule_t::rdwr(loadsave_t *file)
 	if(  file->get_OTRP_version()>=23  ) {
 		file->rdwr_bool(temporary);
 		file->rdwr_bool(same_dep_time);
+	} else {
+		temporary = same_dep_time = false;
 	}
 
 	if(file->is_version_less(99, 12)) {
@@ -261,6 +263,9 @@ void schedule_t::rdwr(loadsave_t *file)
 				file->rdwr_short(entries[i].spacing);
 				file->rdwr_short(entries[i].spacing_shift);
 				file->rdwr_short(entries[i].delay_tolerance);
+			} else {
+				entries[i].spacing = 1;
+				entries[i].spacing_shift = entries[i].delay_tolerance = 0;
 			}
 		}
 	}
@@ -532,5 +537,23 @@ schedule_entry_t const& schedule_t::get_next_entry() const {
 		return dummy_entry;
 	} else {
 		return entries[(current_stop+1)%entries.get_count()];
+	}
+}
+
+void schedule_t::set_spacing_for_all(uint16 v) {
+	for(uint8 i=0; i<entries.get_count(); i++) {
+		entries[i].spacing = v;
+	}
+}
+
+void schedule_t::set_spacing_shift_for_all(uint16 v) {
+	for(uint8 i=0; i<entries.get_count(); i++) {
+		entries[i].spacing_shift = v;
+	}
+}
+
+void schedule_t::set_delay_tolerance_for_all(uint16 v) {
+	for(uint8 i=0; i<entries.get_count(); i++) {
+		entries[i].delay_tolerance = v;
 	}
 }
