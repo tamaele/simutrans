@@ -311,6 +311,7 @@ halt_list_frame_t::halt_list_frame_t(player_t *player) :
 	end_table();
 
 	scrolly = new_component<gui_scrolled_halt_list_t>();
+	scrolly->set_maximize( true );
 
 	fill_list();
 
@@ -390,7 +391,7 @@ bool halt_list_frame_t::action_triggered( gui_action_creator_t *comp,value_t /* 
 		}
 		else {
 			filter_frame = new halt_list_filter_frame_t(m_player, this);
-			create_win(filter_frame, w_info, (ptrdiff_t)this);
+			create_win(filter_frame, w_info, magic_haltlist_filter);
 		}
 	}
 	return true;

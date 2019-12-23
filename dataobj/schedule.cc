@@ -263,6 +263,10 @@ void schedule_t::rdwr(loadsave_t *file)
 				file->rdwr_short(entries[i].spacing);
 				file->rdwr_short(entries[i].spacing_shift);
 				file->rdwr_short(entries[i].delay_tolerance);
+				// v23 can violate spacing must be larger than 0 limitation.
+				if(  file->is_loading()  &&  entries[i].spacing<1  ) {
+					entries[i].spacing = 1;
+				}
 			} else {
 				entries[i].spacing = 1;
 				entries[i].spacing_shift = entries[i].delay_tolerance = 0;
@@ -499,11 +503,16 @@ void schedule_t::gimme_stop_name(cbuffer_t& buf, karte_t* welt, player_t const* 
 	const char *p;
 	halthandle_t halt = haltestelle_t::get_halt(entry.pos, player_);
 	if(halt.is_bound()) {
-		if (entry.minimum_loading != 0  &&  max_chars <= 0) {
-			buf.printf("%d%% ", entry.minimum_loading);
-		}
-		else if(  entry.get_coupling_point()!=0  ) {
+		if(  entry.get_coupling_point()!=0  ) {
 			buf.printf("[#] ");
+		}
+		if(  max_chars <= 0  ) {
+			if(  entry.get_wait_for_time()  ) {
+				buf.printf("%dT ", entry.spacing);
+			}
+			else if (  entry.minimum_loading != 0  ) {
+				buf.printf("%d%% ", entry.minimum_loading);
+			}
 		}
 		p = halt->get_name();
 	}
